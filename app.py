@@ -32,6 +32,7 @@ bootstrap = Bootstrap(app)
 
 store = {}  # 以手机号和验证码作为键值对存储
 
+# 用于手机号验证的表单类
 class PhoneVerificationForm(FlaskForm):
     phone = StringField('请输入手机号', validators=[DataRequired()])  # 手机号
     code = StringField('请输入验证码', validators=[DataRequired()])  # 验证码
@@ -41,6 +42,10 @@ class PhoneVerificationForm(FlaskForm):
         if not _validate_phone(field.data):
             raise ValidationError('Invalid phone number')
 
+# 用于邀请码验证的表单类
+class VipcodeVerificationForm(FlaskForm):
+  vipcode = StringField('邀请码',validators=[DataRequired()])
+  submit = SubmitField('提交')
 
 def _validate_phone(phone):
     if len(str(phone)) != 11:  # 验证长度
@@ -48,7 +53,6 @@ def _validate_phone(phone):
     if not re.match(r'1[3-9]\d{9}', phone):  # 验证格式
         return False
     return True
-
 
 def send_sms(phone, code): 
     try:
@@ -113,28 +117,53 @@ def send_sms(phone, code):
     except TencentCloudSDKException as err:
         print(err)
     else:
-        return True
-    
+        return True  
 
+#手机、验证码，验证函数
 def verify_code(phone, code):
     return store.get(phone) == code  # 从字典根据手机号作为键获取存储的验证码，与传入的验证码已经比较
 
 
-
 @app.route('/', methods=['GET', 'POST'])
-def index():
+def index(): 
+    # from models import Vipcode #导入Vipcode模型类
+
+    # 如果是点击微信授权链接（携带微信code）而来的用户，通过code,获取微信用户身份信息，为该用户建立一条user表数据（略）
+    # userid=user.id 取得用户id,以下用userid = 1
+
+    userid = 1
+    form = VipcodeVerificationForm()
+
+    if form.validate_on_submit():
+        vipcode = form.vipcode.data
+        # vipcode = Vipcode.query.filter_by(user_code=vipcode).first()
+        # if vipcode and vipcode.status_code != 1: #如果该用户输入的邀请码有效，并且该邀请码的状态不是1，并且该用户已通过手机验证
+        return redirect(url_for('bind',vipcode = vipcode,userid = userid)) #重定向记问bind页面时,携带此vipcode码
+
+    return render_template('index.html', form=form)
+
+
+@app.route('/bind/?<string:vipcode><string:userid>', methods=['GET', 'POST'])
+def bind(vipcode,userid):
+    
+    print(vipcode,userid) #test
+
     form = PhoneVerificationForm()
     if form.validate_on_submit():
         phone = form.phone.data
         code = form.code.data
         if not verify_code(phone, code):  # 调用验证函数对验证码进行验证，传入用户提交的验证码
             flash('Wrong code')
-            return redirect(url_for('index'))
+            return redirect(url_for('bind'))
+        # 向user表存入手机号
+        # 向user表存入验证码id
+        # 向vipcode表status字段存入1
+        # 对该用户执行登录（略）
+        # 重定向去某个页面
         flash('Your phone is verified now')
         # 在这里可以对用户数据库表示手机通过验证的字段进行更新
-    return render_template('index.html', form=form)
-
-
+    return render_template('phonebind.html', form=form)
+  
 
 @app.route('/send-code', methods=['POST'])
 def send_sms_code():
@@ -146,6 +175,6 @@ def send_sms_code():
     store[phone] = code  # 存储验证码到 store 字段，使用手机号作为键
     print(f'phone: {phone}, code: {code}')
     if send_sms(phone, code):  # 发送验证码短信，传入手机号和验证码
-        return {'message': '验证码已发送到你手机，请检查。'}
+        return {'message': '验证码已发送到你手机，请注意查收！'}
     else:
         return {'message': 'Something was wrong'}, 500

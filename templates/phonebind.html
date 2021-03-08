@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% from 'bootstrap/form.html' import render_field %}
+
+
+{% block content %}
+<div class="d-flex justify-content-center">
+    <form method="post">
+        {{ form.csrf_token }}
+        {{ render_field(form.phone) }}
+        <button id="code-button" class="btn btn-secondary">获取验证码</button>
+        {{ render_field(form.code) }}
+        {{ render_field(form.submit) }}
+    </form>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+{{ super() }}
+<script>
+    $('#code-button').on('click', function(e) {
+        e.preventDefault();
+        var phone = $('#phone').val();  // 获取手机号输入值
+        if (!phone) {  // 验证是否输入了手机号
+            alert('Phone number is required');
+            return;
+        }
+        $.ajax({  // 发送 AJAX 请求
+            type: 'POST',
+            url: '/send-code',
+            data: JSON.stringify({'phone': phone}),  // 设置请求体，放入手机号
+            contentType: 'application/json;charset=UTF-8',
+            success: function (data) {
+                alert(data.message);  // 显示后端返回的消息
+            },
+            error: function ($xhr) {
+                alert($xhr.responseJSON.message);  // 显示后端返回的错误消息
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+
