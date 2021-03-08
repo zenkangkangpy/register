@@ -1,0 +1,76 @@
+{% from 'bootstrap/utils.html' import render_messages %}
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <!-- Bootstrap CSS -->
+  {% block styles %}
+  {{ bootstrap.load_css() }}
+  <style type="text/css">
+  div.databox
+   {
+     border:0px; 
+     padding:0px;
+     width:7rem;
+     height:7rem;
+     
+   }
+ 
+   div.databoxbg
+   {
+     width:7rem;
+     height:7rem;
+     border:0px;
+     position:absolute;
+     background:#dddddd;
+     border-radius:0.5rem;
+     filter:blur(1px) opacity(20%);
+     z-index:1;
+   }
+ 
+   div.databoxbgopacity
+   {
+     width:7rem;
+     height:7rem;
+     border:0px;
+     position:absolute;
+     background:#dddddd;
+     border-radius:0.5rem;
+     filter:blur(1px) opacity(0);
+     z-index:1;
+   }
+ 
+   .datatxt
+   {
+     position:absolute;
+     z-index: 2;
+   }
+  </style>
+  {% endblock %}
+  
+</head>
+<body style="background-color:#333365">
+  <div class="container-fluid pl-0" >
+    {{ render_messages(dismissible=True, dismiss_animate=True) }}
+    {% block content %}{% endblock %}
+     
+    <!-- 版权信息 -->
+    <footer>
+      <div class="row px-0 pt-2 pb-2 text-white">
+        <div class="col-12 text-center">
+          <img src="{{url_for('static',filename='images/zentullogoicon.png')}}" style="height:2rem;"></img>
+          <h4 style="font-size:14px;" class="text-muted mt-3">©zentul.com 2020</h4>
+          <h4 style="font-size:14px;" class="text-muted">渝ICP备20002171号-1</h4>
+          <h4 style="font-size:14px;" class="text-muted">CHONGQING PAPERMULBERRY CULTURE  CO., LTD.</h4>
+          <h4 style="font-size:14px;" class="text-muted">zentul@foxmail.com</h4>
+        </div>
+      </div>
+    </footer>
+  </div>
+  {% block scripts %}
+    {{ bootstrap.load_js() }}
+  {% endblock %}
+</body>
+</html>
