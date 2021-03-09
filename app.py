@@ -130,17 +130,8 @@ def get_value(phone, key):
 def verify_code(phone, code):
     return get_value(phone, 'code') == code
 
-# def verify_code(phone, code):
-#     # check if the code is expired
-#     created_time = store[phone]['created_time']
-#     now = datetime.now()
-#     delta_seconds = (now - created_time).seconds
-#     if delta_seconds > 60 * 5:  # 5 minutes
-#         return False
-#     return store[phone]['code'] == code
 
-
-#项目口视图函数介绍：
+#项目入口视图函数介绍：
     # 点击微信授权链接（携带微信code）而来的用户，通过code,获取微信用户身份信息，为该用户建立一条user表数据；
     # 渲染一个"阅读条款并同意"复选表单（内容：用户你好……用户告知……拿到邀请码的，请点击提交前往验证注册），如点击同意提交，则让该微信用户携带user表id重定向到以下视图函数。
     # 以下接收函数中，以变量userid = 1代替。
