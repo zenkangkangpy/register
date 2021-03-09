@@ -18,26 +18,56 @@
 {% block scripts %}
 {{ super() }}
 <script>
-    $('#code-button').on('click', function(e) {
+
+    var codeButton = $('#code-button');
+    var currentCount;
+    var totalCount = 60;
+    var countdown;
+    var csrf_token = "{{ csrf_token() }}";
+
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", csrf_token);
+            }
+        }
+    });
+    
+    codeButton.on('click', function(e) {
         e.preventDefault();
-        var phone = $('#phone').val();  // 获取手机号输入值
-        if (!phone) {  // 验证是否输入了手机号
-            alert('Phone number is required');
+        var phone = $('#phone').val();
+        if (!phone) {
+            alert('The phone number is required');
             return;
         }
-        $.ajax({  // 发送 AJAX 请求
+        $.ajax({
             type: 'POST',
             url: '/send-code',
-            data: JSON.stringify({'phone': phone}),  // 设置请求体，放入手机号
+            data: JSON.stringify({'phone': phone}),
             contentType: 'application/json;charset=UTF-8',
             success: function (data) {
-                alert(data.message);  // 显示后端返回的消息
+                alert(data.message);
+                currentCount = totalCount;
+                codeButton.prop('disabled', true);
+                codeButton.html(`Waiting for ${currentCount}s`);
+                countdown = window.setInterval(setRemainTime, 1000);
             },
             error: function ($xhr) {
-                alert($xhr.responseJSON.message);  // 显示后端返回的错误消息
+                alert($xhr.responseJSON.message);
             }
         });
     });
+
+    function setRemainTime() {
+        if (currentCount == 0) {
+            window.clearInterval(countdown);
+            codeButton.prop('disabled', false);
+            codeButton.html('Send Code');
+        } else {
+            currentCount --;
+            codeButton.html(`Waiting for ${currentCount}s`);
+        }
+    }
 </script>
 {% endblock %}
 

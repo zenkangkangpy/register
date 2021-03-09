@@ -1,15 +1,17 @@
-import re
+import re,redis
 from random import randint
 import os
 
 from flask import Flask,Blueprint,render_template,request,redirect,flash,url_for
 from flask_bootstrap import Bootstrap
-from flask_wtf.csrf import CsrfProtect
+from flask_wtf.csrf import CSRFProtect
 from flask_wtf import FlaskForm
 from flask_wtf import FlaskForm
 
+
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, ValidationError
+from datetime import datetime
 
 from tencentcloud.common import credential
 from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
@@ -27,10 +29,11 @@ app.secret_key = 'dev'
 app.config['BOOTSTRAP_SERVE_FROM_LOCAL'] = True
 
 bootstrap = Bootstrap(app)
+csrf = CSRFProtect(app)
+
+r = redis.Redis()
 
 
-
-store = {}  # 以手机号和验证码作为键值对存储
 
 # 用于手机号验证的表单类
 class PhoneVerificationForm(FlaskForm):
@@ -119,19 +122,35 @@ def send_sms(phone, code):
     else:
         return True  
 
+def get_value(phone, key):
+    value = r.hget(phone, key)
+    return value.decode('utf-8') if value else value
+
 #手机、验证码，验证函数
 def verify_code(phone, code):
-    return store.get(phone) == code  # 从字典根据手机号作为键获取存储的验证码，与传入的验证码已经比较
+    return get_value(phone, 'code') == code
 
+# def verify_code(phone, code):
+#     # check if the code is expired
+#     created_time = store[phone]['created_time']
+#     now = datetime.now()
+#     delta_seconds = (now - created_time).seconds
+#     if delta_seconds > 60 * 5:  # 5 minutes
+#         return False
+#     return store[phone]['code'] == code
+
+
+#项目口视图函数介绍：
+    # 点击微信授权链接（携带微信code）而来的用户，通过code,获取微信用户身份信息，为该用户建立一条user表数据；
+    # 渲染一个"阅读条款并同意"复选表单（内容：用户你好……用户告知……拿到邀请码的，请点击提交前往验证注册），如点击同意提交，则让该微信用户携带user表id重定向到以下视图函数。
+    # 以下接收函数中，以变量userid = 1代替。
 
 @app.route('/', methods=['GET', 'POST'])
 def index(): 
     # from models import Vipcode #导入Vipcode模型类
-
-    # 如果是点击微信授权链接（携带微信code）而来的用户，通过code,获取微信用户身份信息，为该用户建立一条user表数据（略）
-    # userid=user.id 取得用户id,以下用userid = 1
-
+  
     userid = 1
+
     form = VipcodeVerificationForm()
 
     if form.validate_on_submit():
@@ -146,21 +165,22 @@ def index():
 @app.route('/bind/?<string:vipcode><string:userid>', methods=['GET', 'POST'])
 def bind(vipcode,userid):
     
-    print(vipcode,userid) #test
+    print(vipcode,'---',userid) #test
 
     form = PhoneVerificationForm()
     if form.validate_on_submit():
         phone = form.phone.data
         code = form.code.data
-        if not verify_code(phone, code):  # 调用验证函数对验证码进行验证，传入用户提交的验证码
-            flash('Wrong code')
-            return redirect(url_for('bind'))
+        
+        if not r.exists(phone):  
+            flash('验证码错误或者过期', 'error')
+            return redirect(url_for('bind',vipcode = vipcode,userid = userid))
         # 向user表存入手机号
         # 向user表存入验证码id
         # 向vipcode表status字段存入1
         # 对该用户执行登录（略）
         # 重定向去某个页面
-        flash('Your phone is verified now')
+        flash('手机验证通过！')
         # 在这里可以对用户数据库表示手机通过验证的字段进行更新
     return render_template('phonebind.html', form=form)
   
@@ -170,11 +190,25 @@ def send_sms_code():
     phone = request.json.get('phone')  # 获取手机号
     # 验证手机号格式
     if not _validate_phone(phone):
-        return {'message': 'Invalid phone number'}, 400
+        return {'message': '输入无效手机号'}, 400
+
+    if r.exists(phone):
+        created_time_str = get_value(phone, 'created_time')
+        created_time = datetime.strptime(created_time_str, '%Y-%m-%d %H:%M:%S')
+        now = datetime.now()
+        delta_seconds = (now - created_time).seconds
+        if delta_seconds < 60:
+            return {'message': '勿频繁操作'}, 400
+
     code = str(randint(100000, 999999))  # 生成随机验证码
-    store[phone] = code  # 存储验证码到 store 字段，使用手机号作为键
+    data = {
+    'code': code,
+    'created_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    r.hset(phone, mapping=data)
+    r.expire(phone, 10 * 60)
     print(f'phone: {phone}, code: {code}')
     if send_sms(phone, code):  # 发送验证码短信，传入手机号和验证码
-        return {'message': '验证码已发送到你手机，请注意查收！'}
+        return {'message': '验证码已发送！'}
     else:
         return {'message': 'Something was wrong'}, 500
